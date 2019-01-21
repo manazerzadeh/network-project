@@ -2,7 +2,7 @@ from src.tools.simpletcp.tcpserver import TCPServer
 
 from src.tools.Node import Node
 import threading
-import typing
+from typing import *
 
 
 class Stream:
@@ -35,7 +35,8 @@ class Stream:
         ip = Node.parse_ip(ip)
         port = Node.parse_port(port)
         self._server_in_buf = []
-        self.nodes = []
+        self.parent_node_address = (None, None)
+        self.nodes: List[Node] = []
         self.server = TCPServer(ip, port, callback, maximum_connections=256, receive_bytes=2048)
         thread1 = threading.Thread(target=self.server.run)
         # todo: problem!. update:I think it's solved!
@@ -70,7 +71,9 @@ class Stream:
         :return:
         """
         # todo: what is setnode?
-        self.nodes.append(Node(server_address, set_root=set_register_connection, set_register=set_register_connection))
+        node = Node(server_address, set_root=set_register_connection, set_register=set_register_connection)
+        self.nodes.append(node)
+        return node
         pass
 
     def remove_node(self, node):
@@ -106,7 +109,7 @@ class Stream:
         ip = Node.parse_ip(ip)
         port = Node.parse_port(port)
         for node in self.nodes:
-            if (node.get_server_address == (ip, port)):
+            if node.get_server_address == (ip, port):
                 return node
         return None
         pass

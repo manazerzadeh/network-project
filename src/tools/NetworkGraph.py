@@ -13,7 +13,8 @@ class GraphNode:
         """
         self.address = address
         self.alive = False
-        self.children = []
+        self.children: List[GraphNode] = []
+        self.parent: GraphNode = None
         pass
 
     def set_parent(self, parent):
@@ -39,7 +40,7 @@ class NetworkGraph:
     def __init__(self, root):
         self.root = root
         root.alive = True
-        self.nodes = [root]
+        self.nodes: List[GraphNode] = [root]
 
     def find_live_node(self, sender):
         """
@@ -59,11 +60,12 @@ class NetworkGraph:
         :return: Best neighbour for sender.
         :rtype: GraphNode
         """
-        node_list: list[GraphNode] = []
-        node_list.append(self.root)
-        while (node_list):
+        if self.find_node(sender[0], sender[1]) is not None:
+            return None
+        node_list: list[GraphNode] = [self.root]
+        while node_list:
             for node in node_list:
-                if (len(node.children) < 2):  # is this syntax right?!
+                if len(node.children) < 2:  # is this syntax right?!
                     return node
                 node_list += node.children
                 node_list.remove(node)
@@ -71,7 +73,7 @@ class NetworkGraph:
 
     def find_node(self, ip, port):
         for node in self.nodes:
-            if (node.server_ip == ip and self.server_port == port):
+            if node.address[0] == ip and node.address[1] == port:
                 return node
         return None
         pass
@@ -88,6 +90,10 @@ class NetworkGraph:
 
     def remove_node(self, node_address):
         node = self.find_node(node_address[0], node_address[1])
+        for child in node.children:
+            child.set_parent(None)
+        parent_node = node.parent
+        parent_node.children.remove(node)
         self.nodes.remove(node)
         pass
 
@@ -111,8 +117,10 @@ class NetworkGraph:
         :return:
         """
         father = self.find_node(father_address)
-        if (father != None):
+        if father is not None:
             node = GraphNode((ip, port))
+            node.alive = True
             node.set_parent(father)
             father.add_child(node)
+            self.nodes.append(node)
         pass

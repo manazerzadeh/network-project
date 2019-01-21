@@ -1,10 +1,12 @@
-import Stream
-from Packet import Packet, PacketFactory
-from UserInterface import UserInterface
-from tools.SemiNode import SemiNode
-from tools.NetworkGraph import NetworkGraph, GraphNode
-from tools import Node
+import src.Stream
+from src.Packet import Packet, PacketFactory
+from src.UserInterface import UserInterface
+from src.tools.SemiNode import SemiNode
+from src.tools.NetworkGraph import NetworkGraph, GraphNode
+from src.tools import Node
+from src.tools import utils
 import time
+import src.Stream as Stream
 import threading
 from typing import *
 
@@ -17,7 +19,7 @@ from typing import *
 
 
 class Peer:
-    def __init__(self, server_ip , server_port, is_root=False , root_address=None ):
+    def __init__(self, server_ip, server_port, is_root=False, root_address=None):
         """
         The Peer object constructor.
 
@@ -44,23 +46,28 @@ class Peer:
         :type is_root: bool
         :type root_address: tuple
         """
+        self.userInterface = UserInterface()
+        self.address = (server_ip, server_port)
+        self.is_root = is_root
         self.root_address = root_address
-        self.stream = Stream(server_ip , server_port)
+        self.stream = Stream.Stream(server_ip, server_port)
         self.packetfactory = PacketFactory()
         self.start_user_interface()
         self.hello_sent_time = 0
-        daemon_thread = threading.Thread(target=self.run_reunion_daemon)
-        daemon_thread.start()
-        if(is_root):
+        self.time_out_limit = 32
+        self.parent_address = (None, None)
+        self.children_addresses: List[(str, str)] = []
+        self.daemon_thread = threading.Thread(target=self.run_reunion_daemon)
+        if is_root:
+            self.daemon_thread.start()
             self.networkGraph = NetworkGraph(self)
-            self.registered_nodes = []
+            self.registered_nodes: List[Node] = []
+            self.last_hello_times = {}
         else:
-            self.register_node = Node(root_address , set_root = True , set_register = True)
-            self.stream.add_node(self.register_node)
+            self.stream.add_node(root_address, set_register_connection=True)
             self.w8_for_back = False
 
-            pass #in peers not root handle run reunion_daeamon when joined the network
-        pass
+            pass  # in peers not root handle run reunion_daeamon when joined the network
 
     def start_user_interface(self):
         """
@@ -68,7 +75,6 @@ class Peer:
 
         :return:
         """
-        self.userInterface = UserInterface()
         UserInterface.run()
         pass
 
@@ -85,16 +91,16 @@ class Peer:
             2. Don't forget to clear our UserInterface buffer.
         :return:
         """
-        #todo: @mamdos handle this shit
+        # todo: @mamdos handle this shit
         for command in commands:
-            if(command == 'Register'):
+            if (command == 'Register'):
                 self.packetfactory.new_register_packet()
-            if(command == 'Advertise'):
+            if (command == 'Advertise'):
                 self.packetfactory.new_advertise_packet()
-            if(command == 'SendMessage'):
+            if (command == 'SendMessage'):
                 pass
             commands.remove(command)
-        
+
         pass
 
     def run(self):
@@ -119,7 +125,7 @@ class Peer:
                 packet = PacketFactory.parse_buffer(buff)
                 self.handle_packet(packet)
             self.handle_user_interface_buffer()
-            self.stream.send_out_buf_messages()#todo. what is register 
+            self.stream.send_out_buf_messages()  # todo. what is register
             time.sleep(2)
         pass
 
@@ -148,10 +154,41 @@ class Peer:
 
         :return:
         """
-        if(self.is_root):
-        else:
-            if(self.w8_for_back):   
 
+        while True:
+            if self.is_root:
+                # check if the reunion time_out has exceeded
+                for address, starting_time in self.last_hello_times.items():
+                    if time.time() - starting_time > self.time_out_limit / 2:
+                        g_node = self.networkGraph.find_node(address[0], address[1])
+                        # turn_off every child of the removing node
+                        up_most_gnode = g_node
+                        children_list = [g_node]
+                        while children_list:
+                            for obj in children_list:
+                                children_list += obj.children
+                                self.networkGraph.turn_off_node(obj.address)
+                                children_list.remove(obj)
+                        self.networkGraph.remove_node(up_most_gnode.address)
+                    else:
+                        pass
+
+                pass
+            else:  # normal node ... not root
+                if self.w8_for_back:
+                    if time.time() - self.hello_sent_time > self.time_out_limit:
+                        self.w8_for_back = False
+                        advertise_pac = self.packetfactory.new_advertise_packet('REQ', self.address)
+                        self.stream.add_message_to_out_buff(self.root_address, advertise_pac.get_buf())
+                        break
+                    else:
+                        pass
+                else:  # send reunion hello again
+                    self.w8_for_back = True
+                    reunion_hello_packet = self.packetfactory.new_reunion_packet('REQ', self.address, [self.address])
+                    self.stream.add_message_to_out_buff(self.parent_address, reunion_hello_packet.get_buf())
+                    self.hello_sent_time = time.time()
+            time.sleep(4)  # Fuck You!
         pass
 
     def send_broadcast_packet(self, broadcast_packet):
@@ -167,9 +204,13 @@ class Peer:
 
         :return:
         """
+        parsed_packet = broadcast_packet.get_buf()
+        for node in self.stream.nodes:
+            if node.get_server_address() != self.root_address:
+                self.stream.add_message_to_out_buff(node.get_server_address(), parsed_packet)
         pass
 
-    def handle_packet(self, packet): # return -1 for invalid packet data
+    def handle_packet(self, packet):  # raise exception if it is not valid
         """
         This function act as a wrapper for other handle_###_packet methods to handle the packet.
 
@@ -180,28 +221,24 @@ class Peer:
 
         :type packet Packet
         """
-        if packet.length != len(packet.get_body):
+        if packet.length != len(packet.get_body()):
             print('The length is not valid')
-            return -1 
-        # just... do the damn validation tests
+            raise Exception('The Length not valid Exception')
+            # just... do the damn validation tests
 
         # Register packet
         if packet.get_type == 1:
             self.__handle_register_packet(packet)
-        elif packet.get_type==2:
-            self.__handle_advertise_packet(packet)    
-        elif packet.get_type==3:
+        elif packet.get_type == 2:
+            self.__handle_advertise_packet(packet)
+        elif packet.get_type == 3:
             self.__handle_join_packet(packet)
-        elif packet.get_type==4:
+        elif packet.get_type == 4:
             self.__handle_message_packet(packet)
-        elif packet.get_type==5:
+        elif packet.get_type == 5:
             self.__handle_reunion_packet(packet)
         else:
             print('Packet type not valid')
-            return -1
-        return 1
-
-
         pass
 
     def __check_registered(self, source_address):
@@ -213,10 +250,13 @@ class Peer:
 
         :return:
         """
-
+        for node in self.registered_nodes:
+            if source_address == node.get_server_address():
+                return True
+        return False
         pass
 
-    def __handle_advertise_packet(self, packet):
+    def __handle_advertise_packet(self, packet):  # todo: check warning 3
         """
         For advertising peers in the network, It is peer discovery message.
 
@@ -245,6 +285,29 @@ class Peer:
 
         :return:
         """
+        type = packet.get_body()[:3]
+        if type == 'REQ':
+            if self.is_root:
+                if self.__check_registered(packet.get_source_server_address()):
+                    father_address = self.networkGraph.find_live_node(packet.get_source_server_address()).address
+                    self.networkGraph.add_node(packet.get_source_server_ip(), int(packet.get_source_server_port())
+                                               , father_address)
+                    resp_packet = PacketFactory.new_advertise_packet('RES', self.address, father_address)
+                    self.stream.add_message_to_out_buff(packet.get_source_server_address(), resp_packet.get_buf())
+
+                else:
+                    raise Exception('Node was not registered')
+            if not self.is_root:
+                if utils.DEBUG: print("Advertise packet in the wrong address:", self.address)
+        if type == 'RES':
+            p_body = packet.get_body()[3:]
+            add = p_body[3:18]
+            port = p_body[18:]
+            self.parent_address = (add, port)
+            self.stream.add_node(self.parent_address, False)
+            join_packet = self.packetfactory.new_join_packet(self.address)
+            self.stream.add_message_to_out_buff(self.parent_address, join_packet.get_buf())
+            self.daemon_thread.start()
         pass
 
     def __handle_register_packet(self, packet):
@@ -262,7 +325,22 @@ class Peer:
         :type packet Packet
         :return:
         """
-        pass
+        p_type = packet.get_body()[:3]
+        if self.is_root:
+            if p_type == 'REQ':
+                self.registered_nodes.append(self.stream.add_node(packet.get_source_server_address(), True))
+            elif p_type == 'RES':
+                pass
+        else:
+            if p_type == 'REQ':
+                pass
+            elif p_type == 'RES':
+                if packet.get_body()[3:] == 'ACK':
+                    advertise_packet = self.packetfactory.new_advertise_packet('REQ', self.address)
+                    self.stream.add_message_to_out_buff(self.address, advertise_packet.get_buf())
+                else:
+                    raise Exception('The Register response is not valid')
+            pass
 
     def __check_neighbour(self, address):
         """
@@ -275,7 +353,12 @@ class Peer:
         :return: Whether is address in our neighbours or not.
         :rtype: bool
         """
-        pass
+        if self.parent_address == address:
+            return True
+        for child in self.children_addresses:
+            if child == address:
+                return True
+        return False
 
     def __handle_message_packet(self, packet):
         """
@@ -291,11 +374,18 @@ class Peer:
 
         :return:
         """
-        pass
+        source_address = packet.get_source_server_address()
+        new_message_packet = self.packetfactory.new_message_packet(packet.get_body(), self.address)
+        if self.__check_neighbour(source_address):
+            for node in self.stream.nodes:
+                if node.get_server_address() != source_address and not node.is_registered:
+                    self.stream.add_message_to_out_buff(node.get_server_address(), packet.get_buf())
+        else:
+            raise Exception('The source was unknown for me!')
 
     def __handle_reunion_packet(self, packet):
         """
-        In this function we should handle Reunion packet was just arrived.
+        In this function we should handle Reunion packet that had just arrived.
 
         Reunion Hello:
             If you are root Peer you should answer with a new Reunion Hello Back packet.
@@ -321,7 +411,7 @@ class Peer:
     def __handle_join_packet(self, packet):
         """
         When a Join packet received we should add a new node to our nodes array.
-        In reality, there is a security level that forbids joining every node to our network.
+        In reality, there is a security level that forbids joining every node to our network. -> k@$3 @m@& baba!
 
         :param packet: Arrived register packet.
 
@@ -330,7 +420,14 @@ class Peer:
 
         :return:
         """
-        pass
+
+        # for better security scenario, we can send a register request as a parent with the address of the new child
+        # to the root to ask if this guy is validated to be in the network of not? and after receiving the ack from the
+        # root, we'll accept the new peer as our child...
+
+        packet_source_address = packet.get_source_server_address()
+        self.stream.add_node(packet_source_address, False)
+        self.children_addresses.append(packet_source_address)
 
     def __get_neighbour(self, sender):
         """
@@ -343,4 +440,5 @@ class Peer:
         :param sender: Sender of the packet
         :return: The specified neighbour for the sender; The format is like ('192.168.001.001', '05335').
         """
+        return self.networkGraph.find_live_node(sender).address
         pass
