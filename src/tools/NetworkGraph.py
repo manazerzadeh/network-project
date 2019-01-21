@@ -1,6 +1,7 @@
 import time
-import Node
+import src.Node
 from typing import *
+
 
 class GraphNode:
     def __init__(self, address):
@@ -18,6 +19,7 @@ class GraphNode:
     def set_parent(self, parent):
         self.parent = parent
         pass
+
     def set_address(self, new_address):
         self.address = new_address
         pass
@@ -61,7 +63,7 @@ class NetworkGraph:
         node_list.append(self.root)
         while (node_list):
             for node in node_list:
-                if(len(node.children) < 2): # is this syntax right?!
+                if (len(node.children) < 2):  # is this syntax right?!
                     return node
                 node_list += node.children
                 node_list.remove(node)
@@ -69,23 +71,23 @@ class NetworkGraph:
 
     def find_node(self, ip, port):
         for node in self.nodes:
-            if(node.server_ip == ip and self.server_port == port):
+            if (node.server_ip == ip and self.server_port == port):
                 return node
         return None
         pass
 
     def turn_on_node(self, node_address):
-        node = self.find_node(node_address[0],node_address[1])
+        node = self.find_node(node_address[0], node_address[1])
         node.alive = True
         pass
 
     def turn_off_node(self, node_address):
-        node = self.find_node(node_address[0],node_address[1])
+        node = self.find_node(node_address[0], node_address[1])
         node.alive = False
         pass
 
     def remove_node(self, node_address):
-        node = self.find_node(node_address[0],node_address[1])
+        node = self.find_node(node_address[0], node_address[1])
         self.nodes.remove(node)
         pass
 
@@ -109,8 +111,8 @@ class NetworkGraph:
         :return:
         """
         father = self.find_node(father_address)
-        if(father != None):
-            node = GraphNode((ip,port))
+        if (father != None):
+            node = GraphNode((ip, port))
             node.set_parent(father)
             father.add_child(node)
         pass

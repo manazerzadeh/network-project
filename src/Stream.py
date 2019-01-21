@@ -1,8 +1,9 @@
-from tools.simpletcp.tcpserver import TCPServer
+from src.tools.simpletcp.tcpserver import TCPServer
 
-from tools.Node import Node
+from src.tools.Node import Node
 import threading
 import typing
+
 
 class Stream:
 
@@ -18,6 +19,7 @@ class Stream:
         :param ip: 15 characters
         :param port: 5 characters
         """
+
         def callback(address, queue, data):
             """
             The callback function will run when a new data received from server_buffer.
@@ -30,14 +32,13 @@ class Stream:
             queue.put(bytes('ACK', 'utf8'))
             self._server_in_buf.append(data)
 
-        
         ip = Node.parse_ip(ip)
         port = Node.parse_port(port)
         self._server_in_buf = []
         self.nodes = []
-        self.server = TCPServer(ip, port , callback , maximum_connections= 256 , receive_bytes = 2048)
-        thread1 = threading.Thread(target= self.server.run)
-        #todo: problem!. update:I think it's solved!
+        self.server = TCPServer(ip, port, callback, maximum_connections=256, receive_bytes=2048)
+        thread1 = threading.Thread(target=self.server.run)
+        # todo: problem!. update:I think it's solved!
         pass
 
     def get_server_address(self):
@@ -46,7 +47,7 @@ class Stream:
         :return: Our TCPServer address
         :rtype: tuple
         """
-        return ((self.server.ip , self.server.port))
+        return self.server.ip, self.server.port
 
     def clear_in_buff(self):
         """
@@ -68,8 +69,8 @@ class Stream:
 
         :return:
         """
-        #todo: what is setnode?
-        self.nodes.append(Node(server_address,set_root= False, set_register= set_register_connection))
+        # todo: what is setnode?
+        self.nodes.append(Node(server_address, set_root=set_register_connection, set_register=set_register_connection))
         pass
 
     def remove_node(self, node):
@@ -105,7 +106,7 @@ class Stream:
         ip = Node.parse_ip(ip)
         port = Node.parse_port(port)
         for node in self.nodes:
-            if(node.get_server_address == (ip, port)):
+            if (node.get_server_address == (ip, port)):
                 return node
         return None
         pass
@@ -123,8 +124,8 @@ class Stream:
 
         :return:
         """
-        node = get_node_by_server(address)
-        if(node not None):
+        node = self.get_node_by_server(address)
+        if node:
             node.add_message_to_out_buff(message)
         pass
 
@@ -137,7 +138,7 @@ class Stream:
         """
         return self._server_in_buf
 
-    def send_messages_to_node(self, node : Node):
+    def send_messages_to_node(self, node: Node):
         """
         Send buffered messages to the 'node'
 
@@ -150,8 +151,11 @@ class Stream:
 
         :return:
         """
-        #todo: handle exception
-        node.send_message()
+        # todo: handle exception
+        try:
+            node.send_message()
+        except:
+            self.remove_node(node)
         pass
 
     def send_out_buf_messages(self, only_register=False):
@@ -160,6 +164,11 @@ class Stream:
 
         :return:
         """
-        for node in self.nodes:
-            send_messages_to_node(node)
+        if only_register:
+            for node in self.nodes:
+                if node.is_registered:
+                    self.send_messages_to_node(node)
+        else:
+            for node in self.nodes:
+                self.send_messages_to_node(node)
         pass
