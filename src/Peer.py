@@ -44,15 +44,20 @@ class Peer:
         :type is_root: bool
         :type root_address: tuple
         """
+        self.root_address = root_address
         self.stream = Stream(server_ip , server_port)
         self.packetfactory = PacketFactory()
+        self.start_user_interface()
+        self.hello_sent_time = 0
+        daemon_thread = threading.Thread(target=self.run_reunion_daemon)
+        daemon_thread.start()
         if(is_root):
             self.networkGraph = NetworkGraph(self)
-            daemon_thread = threading.Thread(target=self.run_reunion_daemon)
-            daemon_thread.start()
             self.registered_nodes = []
         else:
-            self.stream.add_node()
+            self.register_node = Node(root_address , set_root = True , set_register = True)
+            self.stream.add_node(self.register_node)
+            self.w8_for_back = False
 
             pass #in peers not root handle run reunion_daeamon when joined the network
         pass
@@ -143,6 +148,10 @@ class Peer:
 
         :return:
         """
+        if(self.is_root):
+        else:
+            if(self.w8_for_back):   
+
         pass
 
     def send_broadcast_packet(self, broadcast_packet):
