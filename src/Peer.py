@@ -1,14 +1,13 @@
-import src.Stream
+import threading
+import time
+from typing import *
+
+import src.Stream as Stream
 from src.Packet import Packet, PacketFactory
 from src.UserInterface import UserInterface
-from src.tools.SemiNode import SemiNode
-from src.tools.NetworkGraph import NetworkGraph, GraphNode
 from src.tools import Node
 from src.tools import utils
-import time
-import src.Stream as Stream
-import threading
-from typing import *
+from src.tools.NetworkGraph import NetworkGraph
 
 """
     Peer is our main object in this project.
@@ -91,15 +90,26 @@ class Peer:
             2. Don't forget to clear our UserInterface buffer.
         :return:
         """
-        # todo: @mamdos handle this shit
-        for command in commands:
-            if (command == 'Register'):
-                self.packetfactory.new_register_packet()
-            if (command == 'Advertise'):
-                self.packetfactory.new_advertise_packet()
-            if (command == 'SendMessage'):
-                pass
-            commands.remove(command)
+        # todo: @mamdos handle this shit... OK baba!
+        commands = self.userInterface.buffer
+        is_sendMessage = False
+        for index in range(len(commands)):
+            if is_sendMessage:
+                is_sendMessage = False
+                new_broadcast_message = self.packetfactory.new_message_packet(commands[index], self.address)
+                self.stream.add_message_to_out_buff(self.parent_address, new_broadcast_message.get_buf())
+                for node in self.children_addresses:
+                    self.stream.add_message_to_out_buff(node, new_broadcast_message.get_buf())
+            if commands[index] == 'Register':
+                new_register_packet = self.packetfactory.new_register_packet('REQ', self.address)
+                self.stream.add_message_to_out_buff(self.root_address, new_register_packet.get_buf())
+            elif commands[index] == 'Advertise':
+                new_advertise_packet = self.packetfactory.new_advertise_packet('REQ', self.address)
+                self.stream.add_message_to_out_buff(self.root_address, new_advertise_packet.get_buf())
+            elif commands[index] == 'SendMessage': # todo: fix the message body pls!
+                is_sendMessage = True
+            commands.pop(index)
+            index -= 1
 
         pass
 
@@ -379,7 +389,7 @@ class Peer:
         if self.__check_neighbour(source_address):
             for node in self.stream.nodes:
                 if node.get_server_address() != source_address and not node.is_registered:
-                    self.stream.add_message_to_out_buff(node.get_server_address(), packet.get_buf())
+                    self.stream.add_message_to_out_buff(node.get_server_address(), new_message_packet.get_buf())
         else:
             raise Exception('The source was unknown for me!')
 
@@ -406,7 +416,53 @@ class Peer:
         :param packet: Arrived reunion packet
         :return:
         """
-        pass
+        p_type = packet.get_body()[:3]
+        entry_num = int(packet.get_body()[3:5])
+        nodes_array = []
+        for i in range(entry_num):
+            array_entry = (packet.get_body()[5+20*i:5+20*i+15], packet.get_body()[5+20*i+15:5+20*i+15+5])
+            nodes_array.append(array_entry)
+        if self.is_root:
+            # update the time of the node/peer(fuck!) that the packet has received from
+            if p_type == 'REQ':
+                self.last_hello_times[nodes_array[0]] = time.time()
+                send_to_node_address = nodes_array[-1]
+                self.networkGraph.turn_on_node(send_to_node_address)
+                nodes_array.reverse()
+                new_reunion_back_packet = self.packetfactory.new_reunion_packet('RES', self.address, nodes_array)
+                self.stream.add_message_to_out_buff(send_to_node_address,new_reunion_back_packet.get_buf())
+            elif p_type == 'RES:':
+                pass
+            else:
+                raise Exception('Reunion packet type is invalid (Root)')
+        else:
+            if p_type == 'REQ':
+                nodes_array.append(self.address)
+                new_reunion_back_packet = self.packetfactory.new_reunion_packet('REQ', self.address, nodes_array)
+                send_to_node_address = self.parent_address
+                self.stream.add_message_to_out_buff(send_to_node_address, new_reunion_back_packet.get_buf())
+
+            elif p_type == 'RES':
+                if entry_num == 1:
+                    if nodes_array[0] == self.address: # we received the reunion back successfully
+                        self.w8_for_back = False
+                        print('Reunion Hello Back is received Successfully!')
+                    else:
+                        raise Exception('The destination of the Reunion Back was wrong!')
+                else:
+                    if nodes_array[0] == self.address:
+                        nodes_array.remove(self.address)
+                        send_to_node_address = nodes_array[0]
+                        if self.__check_neighbour(send_to_node_address):
+                            new_reunion_back_packet = self.packetfactory.new_reunion_packet('RES', self.address
+                                                                                            , nodes_array)
+                            self.stream.add_message_to_out_buff(nodes_array[0], new_reunion_back_packet.get_buf())
+                        else:
+                            raise Exception('The next address is not a neighbour or something has gone wrong!')
+                    else:
+                        raise Exception('The end node was not mine!')
+            else:
+                Exception('Reunion type is invalid (non-root)')
 
     def __handle_join_packet(self, packet):
         """

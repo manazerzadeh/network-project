@@ -1,9 +1,10 @@
 import threading
 import time
+from typing import *
 
 
 class UserInterface(threading.Thread):
-    buffer = []
+    buffer: List[str] = []
 
 
 def run(self):
