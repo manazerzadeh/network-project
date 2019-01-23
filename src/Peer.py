@@ -5,7 +5,7 @@ from typing import *
 from src.Stream import Stream
 from src.Packet import Packet, PacketFactory
 from src.UserInterface import UserInterface
-from src.tools import Node
+from src.tools.Node import Node
 from src.tools import utils
 from src.tools.NetworkGraph import NetworkGraph
 
@@ -54,14 +54,14 @@ class Peer:
         self.start_user_interface()
         self.hello_sent_time = 0
         self.time_out_limit = 32
+        self.last_hello_times = {}
+        self.registered_nodes: List[Node] = []
         self.parent_address = (None, None)
         self.children_addresses: List[(str, str)] = []
         self.daemon_thread = threading.Thread(target=self.run_reunion_daemon)
         if is_root:
             self.daemon_thread.start()
             self.networkGraph = NetworkGraph(self)
-            self.registered_nodes: List[Node] = []
-            self.last_hello_times = {}
         else:
             self.stream.add_node(root_address, set_register_connection=True)
             self.w8_for_back = False
@@ -74,7 +74,7 @@ class Peer:
 
         :return:
         """
-        self.userInterface.run()
+        threading.Thread(target=self.userInterface.run).start()
         pass
 
     def handle_user_interface_buffer(self):
@@ -101,7 +101,8 @@ class Peer:
                 for node in self.children_addresses:
                     self.stream.add_message_to_out_buff(node, new_broadcast_message.get_buf())
             if commands[index] == 'Register':
-                new_register_packet = self.packetfactory.new_register_packet('REQ', self.address)
+                std_root_addr = (self.root_address[0], Node.parse_port(self.root_address[1]))
+                new_register_packet = self.packetfactory.new_register_packet('REQ', self.address, std_root_addr)
                 self.stream.add_message_to_out_buff(self.root_address, new_register_packet.get_buf())
             elif commands[index] == 'Advertise':
                 new_advertise_packet = self.packetfactory.new_advertise_packet('REQ', self.address)

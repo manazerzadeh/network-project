@@ -3,6 +3,7 @@ from src.tools.Node import Node
 import threading
 from typing import *
 
+
 class Stream:
 
     def __init__(self, ip, port):
@@ -36,7 +37,7 @@ class Stream:
         self.parent_node_address = (None, None)
         self.nodes: List[Node] = []
         self.server = TCPServer(ip, port, callback, maximum_connections=256, receive_bytes=2048)
-        thread1 = threading.Thread(target=self.server.run)
+        threading.Thread(target=self.server.run).start()
         # todo: problem!. update:I think it's solved!
         pass
 
@@ -125,7 +126,7 @@ class Stream:
 
         :return:
         """
-        node = self.get_node_by_server(address)
+        node = self.get_node_by_server(address[0], address[1])
         if node:
             node.add_message_to_out_buff(message)
         pass
