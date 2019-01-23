@@ -2,7 +2,7 @@ import threading
 import time
 from typing import *
 
-import src.Stream as Stream
+from src.Stream import Stream
 from src.Packet import Packet, PacketFactory
 from src.UserInterface import UserInterface
 from src.tools import Node
@@ -49,7 +49,7 @@ class Peer:
         self.address = (server_ip, server_port)
         self.is_root = is_root
         self.root_address = root_address
-        self.stream = Stream.Stream(server_ip, server_port)
+        self.stream = Stream(server_ip, server_port)
         self.packetfactory = PacketFactory()
         self.start_user_interface()
         self.hello_sent_time = 0
@@ -74,7 +74,7 @@ class Peer:
 
         :return:
         """
-        UserInterface.run()
+        self.userInterface.run()
         pass
 
     def handle_user_interface_buffer(self):

@@ -25,7 +25,7 @@ class ServerSocket:
             self.ip = mode
         # Handle the socket's port.
         # This should be a high (four-digit) for development.
-        self.port = port
+        self.port = int(port)
         if type(self.port) != int:
             print("port must be an int", file=sys.stderr)
             raise ValueError

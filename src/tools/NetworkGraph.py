@@ -1,5 +1,5 @@
 import time
-import src.Node
+from src.tools.Node import Node
 from typing import *
 
 

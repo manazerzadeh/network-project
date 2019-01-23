@@ -1,4 +1,4 @@
-from src.tools.simpletcp.clientsocket import ClientSocket
+from src.tools.simpletcp.clientsocket import *
 
 
 class Node:
@@ -31,7 +31,7 @@ class Node:
         try:
             self.socket = ClientSocket(self.server_ip, int(self.server_port), single_use=False)
         except:
-            raise Exception('Exception while creating ClientSocket') # todo: is this right?!... yes...fuck you!
+            raise Exception('Exception while creating ClientSocket')  # todo: is this right?!... yes...fuck you!
         pass
 
     def send_message(self):

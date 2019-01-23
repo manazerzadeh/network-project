@@ -1,9 +1,7 @@
 from src.tools.simpletcp.tcpserver import TCPServer
-
 from src.tools.Node import Node
 import threading
 from typing import *
-
 
 class Stream:
 
