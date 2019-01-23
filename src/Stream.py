@@ -108,7 +108,8 @@ class Stream:
         ip = Node.parse_ip(ip)
         port = Node.parse_port(port)
         for node in self.nodes:
-            if node.get_server_address == (ip, port):
+            node_server_address = node.get_server_address()
+            if node_server_address[0] == ip and node_server_address[1] == port:
                 return node
         return None
         pass

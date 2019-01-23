@@ -42,7 +42,7 @@ class Node:
         :return:
         """
         for message in self.out_buff:
-            self.socket.send(message)
+            self.socket.send(bytes(message))
         # todo: should the out_buff be clear after sending?
         self.out_buff.clear()
         pass
@@ -55,7 +55,7 @@ class Node:
         :return:
         """
         # todo: i don't know for sure if this'll work!
-        if type(message) != bytearray or type(message) != str:
+        if type(message) is not (bytearray or str):
             raise ValueError
         self.out_buff.append(message)
 

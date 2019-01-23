@@ -238,13 +238,13 @@ class Peer:
             # just... do the damn validation tests
 
         # Register packet
-        if packet.get_type == 1:
+        if packet.get_type() == 1:
             self.__handle_register_packet(packet)
-        elif packet.get_type == 2:
+        elif packet.get_type() == 2:
             self.__handle_advertise_packet(packet)
-        elif packet.get_type == 3:
+        elif packet.get_type() == 3:
             self.__handle_join_packet(packet)
-        elif packet.get_type == 4:
+        elif packet.get_type() == 4:
             self.__handle_message_packet(packet)
         elif packet.get_type == 5:
             self.__handle_reunion_packet(packet)
