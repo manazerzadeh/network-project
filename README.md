@@ -5,3 +5,4 @@ Each client send register request to the root first, then gets it's father to jo
 When connected each client sends a 'Reunion Hello' to his father to infrom the root, that specific client is active. In response, root
 sends reunion hello back to that specific client. 
 Following is the UML diagram of the network:
+![Screenshot](image.png)
